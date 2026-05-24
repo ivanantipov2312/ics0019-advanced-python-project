@@ -1,7 +1,7 @@
+import joblib
 import matplotlib.pyplot as plt  # installed automatically with seaborn
 import seaborn as sns
 from sklearn.metrics import confusion_matrix
-import joblib
 
 y_test = joblib.load("y_test.pkl")
 y_pred = joblib.load("y_pred.pkl")
@@ -15,8 +15,14 @@ labels = ["DoS", "Normal", "Probe", "R2L", "U2R"]
 cm = confusion_matrix(y_test_labels, y_pred_labels, labels=labels)
 
 plt.figure(figsize=(8, 6))
-sns.heatmap(cm, annot=True, fmt="d", cmap="Blues",
-            xticklabels=labels, yticklabels=labels)
+sns.heatmap(
+    cm,
+    annot=True,
+    fmt="d",
+    cmap="Blues",
+    xticklabels=labels,
+    yticklabels=labels,
+)
 plt.xlabel("Predicted")
 plt.ylabel("Actual")
 plt.title("Confusion Matrix")
