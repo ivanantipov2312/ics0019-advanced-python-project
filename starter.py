@@ -1,5 +1,6 @@
 import pandas as pd
 from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import LabelEncoder
 
 # ==============================================================
 # 1. LOAD DATA
@@ -87,32 +88,95 @@ df_train_processed = df_full.iloc[:train_len].copy()
 df_test_processed = df_full.iloc[train_len:].copy()
 
 X_train = df_train_processed.drop(columns=['category'])
-y_train = df_train_processed['category']
-
 X_test = df_test_processed.drop(columns=['category'])
-y_test = df_test_processed['category']
+
+label_encoder_y = LabelEncoder()
+
+y_train = label_encoder_y.fit_transform(df_train_processed['category'])
+y_test = label_encoder_y.transform(df_test_processed['category'])
+
 
 print(f"\nFeatures: {X_train.shape[1]}")
 print(f"\nTraining set class distribution:")
-print(y_train.value_counts())
+print(pd.Series(label_encoder_y.inverse_transform(y_train)).value_counts())
 print(f"\nTest set class distribution:")
-print(y_test.value_counts())
+print(pd.Series(label_encoder_y.inverse_transform(y_test)).value_counts())
+# ==============================================================
+# 5. HANDLE CLASS IMBALANCE (SMOTE)
+# ==============================================================
+
+from imblearn.over_sampling import SMOTE
+
+print("\nApplying SMOTE to balance classes...")
+print("SMOTE: k_neighbors = 5")
+smote = SMOTE(k_neighbors=5)
+X_train_res, y_train_res = smote.fit_resample(X_train, y_train)
+
+print("\nBalanced class distribution:")
+print(pd.Series(y_train_res).value_counts())
 
 # ==============================================================
-# YOUR WORK STARTS HERE
+# 6. MODEL: XGBOOST
 # ==============================================================
-# 
-# You now have:
-#   X_train, y_train  — training features and labels (5 categories)
-#   X_test, y_test    — test features and labels (5 categories)
-#
-# Your task:
-#   1. Train one or more models on X_train / y_train
-#   2. Predict on X_test
-#   3. Evaluate using macro F1-score
-#
-# Useful imports for evaluation:
-#   from sklearn.metrics import classification_report, confusion_matrix, f1_score
-#
-# To compute macro F1:
-#   f1_score(y_test, y_pred, average='macro')
+
+from xgboost import XGBClassifier
+
+model = XGBClassifier(
+    n_estimators=300,
+    max_depth=6,
+    learning_rate=0.1,
+    subsample=0.8,
+    colsample_bytree=0.8,
+    random_state=42,
+    n_jobs=-1,
+    eval_metric='mlogloss'
+)
+
+# ==============================================================
+# 7. CROSS-VALIDATION (MANDATORY)
+# ==============================================================
+
+from sklearn.model_selection import cross_val_score
+
+print("\nRunning cross-validation...")
+cv_scores = cross_val_score(
+    model,
+    X_train_res,
+    y_train_res,
+    cv=5,
+    scoring='f1_macro'
+)
+
+print(f"Cross-validation Macro F1: {cv_scores.mean():.4f} (± {cv_scores.std():.4f})")
+
+# ==============================================================
+# 8. TRAIN FINAL MODEL
+# ==============================================================
+
+print("\nTraining final model...")
+model.fit(X_train_res, y_train_res)
+
+# ==============================================================
+# 9. PREDICT AND EVALUATE
+# ==============================================================
+
+from sklearn.metrics import classification_report, confusion_matrix, f1_score
+
+print("\nEvaluating on test set...")
+y_pred = model.predict(X_test)
+
+macro_f1 = f1_score(y_test, y_pred, average='macro')
+
+print("\nClassification Report:")
+print(classification_report(y_test, y_pred))
+
+print(f"Macro F1 Score (Test): {macro_f1:.4f}")
+
+import joblib
+
+joblib.dump(model, "xgb_model.pkl")
+joblib.dump(label_encoder_y, "label_encoder.pkl")
+joblib.dump(y_test, "y_test.pkl")
+joblib.dump(y_pred, "y_pred.pkl")
+joblib.dump(label_encoder_y, "label_encoder.pkl")
+print("Model saved!")
